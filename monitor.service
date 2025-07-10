@@ -1,0 +1,13 @@
+[Unit]
+Description=Linux Monitor Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 "/home/miruna/stagiu de practica/Monitor.py"
+Restart=on-failure
+User=miruna
+
+[Install]
+WantedBy=multi-user.target
+
