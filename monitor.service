@@ -4,7 +4,8 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 "/home/miruna/stagiu de practica/Monitor.py"
+ExecStart=/usr/bin/python3 "/home/miruna/Desktop/git/Monitorizare-sistem-Linux/Monitor.py"
+WorkingDirectory=/home/miruna/Desktop/git/Monitorizare-sistem-Linux
 Restart=on-failure
 User=miruna
 
