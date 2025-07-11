@@ -10,6 +10,7 @@ from datetime import datetime
 import logging
 import socket
 
+
 # === Configurație ===
 CONFIG = {
     "MONITORED_FILES": ["/etc/passwd", "/etc/hosts"],  # /etc/shadow eliminat din motive de securitate
@@ -26,6 +27,8 @@ CONFIG = {
     }
 }
 
+
+
 # === Inițializare logging ===
 os.makedirs(CONFIG["LOG_DIR"], exist_ok=True)
 os.makedirs(os.path.dirname(CONFIG["HASH_FILE"]), exist_ok=True)
@@ -40,6 +43,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+
 # === Utilitare ===
 def sha256sum(path):
     """Calculează hash SHA256 pentru un fișier"""
@@ -49,6 +54,7 @@ def sha256sum(path):
     except Exception as e:
         logger.warning(f"Nu pot calcula hash pentru {path}: {str(e)}")
         return None
+
 
 def load_hashes():
     """Încarcă hash-urile salvate anterior"""
@@ -60,6 +66,7 @@ def load_hashes():
         logger.error(f"Eroare la încărcarea hash-urilor: {str(e)}")
     return {}
 
+
 def save_hashes(hashes):
     """Salvează hash-urile curente"""
     try:
@@ -67,6 +74,7 @@ def save_hashes(hashes):
             json.dump(hashes, f, indent=2)
     except Exception as e:
         logger.error(f"Eroare la salvarea hash-urilor: {str(e)}")
+
 
 def detect_file_changes():
     """Detectează modificări în fișierele monitorizate"""
@@ -89,6 +97,7 @@ def detect_file_changes():
     save_hashes(new_hashes)
     return alerts
 
+
 def log_alerts(alerts):
     """Înregistrează alerte în fișierul de log"""
     try:
@@ -97,6 +106,8 @@ def log_alerts(alerts):
                 f.write(f"{datetime.now().isoformat()} {alert}\n")
     except Exception as e:
         logger.error(f"Eroare la înregistrarea alertelor: {str(e)}")
+
+
 
 # === Monitorizare resurse sistem ===
 def collect_system_metrics():
@@ -161,6 +172,7 @@ def collect_system_metrics():
         "net_recv": net_recv
     }
 
+
 def get_top_processes():
     """Obține top procese pentru CPU, memorie și I/O"""
     top_cpu = []
@@ -185,6 +197,8 @@ def get_top_processes():
         "top_disk": sorted(top_disk, key=lambda x: x[2], reverse=True)[:3]
     }
 
+
+
 # === Verificări de securitate ===
 def check_open_ports():
     """Verifică porturile deschise"""
@@ -198,6 +212,7 @@ def check_open_ports():
         logger.error(f"Eroare la verificarea porturilor: {str(e)}")
         return ""
 
+
 def check_installed_packages():
     """Verifică pachete nou instalate"""
     try:
@@ -209,6 +224,7 @@ def check_installed_packages():
     except Exception as e:
         logger.error(f"Eroare la verificarea pachetelor: {str(e)}")
     return ""
+
 
 def check_root_processes():
     """Identifică procese care rulează cu drepturi de root"""
@@ -230,6 +246,7 @@ def check_root_processes():
 
     return root_procs
 
+
 def get_cronjobs():
     """Obține cronjob-uri pentru utilizatorul curent"""
     try:
@@ -242,6 +259,7 @@ def get_cronjobs():
     except Exception as e:
         logger.error(f"Eroare la obținerea cronjob-urilor: {str(e)}")
         return ""
+
 
 def monitor_app(name):
     """Monitorizează o aplicație specifică"""
@@ -258,6 +276,7 @@ def monitor_app(name):
     
     return app_processes
 
+
 def monitor_sshd():
     try:
         result = subprocess.run(['systemctl', 'is-active', 'sshd'],
@@ -269,6 +288,8 @@ def monitor_sshd():
     except Exception as e:
         logger.error(f"Eroare verificare SSH: {str(e)}")
         return False
+
+
 
 # === Salvare date ===
 def save_to_csv(data):
