@@ -8,6 +8,8 @@ ExecStart=/usr/bin/python3 "/home/miruna/Desktop/git/Monitorizare-sistem-Linux/M
 WorkingDirectory=/home/miruna/Desktop/git/Monitorizare-sistem-Linux
 Restart=on-failure
 User=root
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
