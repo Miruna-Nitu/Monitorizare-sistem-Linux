@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import pwd 
 import psutil
 import time
 import csv
@@ -13,10 +14,11 @@ import socket
 
 # === Configurație ===
 CONFIG = {
-    "MONITORED_FILES": ["/etc/passwd", "/etc/hosts"],  # /etc/shadow eliminat din motive de securitate
+    "MONITORED_FILES": ["/etc/passwd", "/etc/hosts","/etc/shadow"],
     "LOG_DIR": os.path.expanduser("~/monitor_logs"),
     "HASH_FILE": os.path.expanduser("~/monitor_logs/hashes.json"),
     "CSV_LOG": os.path.expanduser("~/monitor_logs/system.csv"),
+    "TOP_PROC_LOG": os.path.expanduser("~/monitor_logs/top_processes.csv"),
     "ALERT_LOG": os.path.expanduser("~/monitor_logs/alerts.log"),
     "LOG_INTERVAL": 60,
     "MONITOR_APP": "sshd",
@@ -43,11 +45,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# === Variabile pentru calcule diferentiale ===
+prev_read = 0
+prev_write = 0
+prev_sent = 0
+prev_recv = 0
+prev_time = time.time()
 
 
 # === Utilitare ===
 def sha256sum(path):
-    """Calculează hash SHA256 pentru un fișier"""
+    """Calculeaza hash SHA256 pentru un fisier"""
     try:
         with open(path, "rb") as f:
             return hashlib.sha256(f.read()).hexdigest()
@@ -57,18 +65,18 @@ def sha256sum(path):
 
 
 def load_hashes():
-    """Încarcă hash-urile salvate anterior"""
+    """Incarcă hash-urile salvate anterior"""
     try:
         if os.path.exists(CONFIG["HASH_FILE"]):
             with open(CONFIG["HASH_FILE"], "r") as f:
                 return json.load(f)
     except Exception as e:
-        logger.error(f"Eroare la încărcarea hash-urilor: {str(e)}")
+        logger.error(f"Eroare la încarcarea hash-urilor: {str(e)}")
     return {}
 
 
 def save_hashes(hashes):
-    """Salvează hash-urile curente"""
+    """Salveaza hash-urile curente"""
     try:
         with open(CONFIG["HASH_FILE"], "w") as f:
             json.dump(hashes, f, indent=2)
@@ -77,7 +85,7 @@ def save_hashes(hashes):
 
 
 def detect_file_changes():
-    """Detectează modificări în fișierele monitorizate"""
+    """Detecteaza modificari în fisierele monitorizate"""
     alerts = []
     old_hashes = load_hashes()
     new_hashes = {}
@@ -90,7 +98,7 @@ def detect_file_changes():
         new_hashes[path] = current_hash
         
         if path in old_hashes and old_hashes[path] != current_hash:
-            alert_msg = f"Fișier modificat: {path}"
+            alert_msg = f"Fisier modificat: {path}"
             alerts.append(alert_msg)
             logger.warning(alert_msg)
     
@@ -99,7 +107,7 @@ def detect_file_changes():
 
 
 def log_alerts(alerts):
-    """Înregistrează alerte în fișierul de log"""
+    """Înregistreaza alerte în fisierul de log"""
     try:
         with open(CONFIG["ALERT_LOG"], "a") as f:
             for alert in alerts:
@@ -111,13 +119,13 @@ def log_alerts(alerts):
 
 # === Monitorizare resurse sistem ===
 def collect_system_metrics():
-    """Colectează metrici de sistem"""
+    """Colecteaza metrici de sistem"""
     ts = datetime.now().isoformat()
     
     try:
         cpu = psutil.cpu_percent(interval=1)
         if cpu > CONFIG["ALERT_THRESHOLDS"]["cpu"]:
-            logger.warning(f"Utilizare CPU ridicată: {cpu}%")
+            logger.warning(f"Utilizare CPU ridicata: {cpu}%")
     except Exception as e:
         logger.error(f"Eroare la monitorizarea CPU: {str(e)}")
         cpu = 0
@@ -125,7 +133,7 @@ def collect_system_metrics():
     try:
         mem = psutil.virtual_memory().percent
         if mem > CONFIG["ALERT_THRESHOLDS"]["memory"]:
-            logger.warning(f"Utilizare memorie ridicată: {mem}%")
+            logger.warning(f"Utilizare memorie ridicata: {mem}%")
     except Exception as e:
         logger.error(f"Eroare la monitorizarea memoriei: {str(e)}")
         mem = 0
@@ -137,11 +145,11 @@ def collect_system_metrics():
                 usage = psutil.disk_usage(part.mountpoint)
                 disks[part.mountpoint] = usage.percent
                 if usage.percent > CONFIG["ALERT_THRESHOLDS"]["disk"]:
-                    logger.warning(f"Utilizare disk ridicată pe {part.mountpoint}: {usage.percent}%")
+                    logger.warning(f"Utilizare disk ridicata pe {part.mountpoint}: {usage.percent}%")
             except Exception as e:
                 logger.warning(f"Eroare la monitorizarea discului {part.mountpoint}: {str(e)}")
     except Exception as e:
-        logger.error(f"Eroare la obținerea partițiilor: {str(e)}")
+        logger.error(f"Eroare la obtinerea partitiilor: {str(e)}")
 
     try:
         disk_io = psutil.disk_io_counters()
@@ -157,9 +165,26 @@ def collect_system_metrics():
         net_sent = net_io.bytes_sent
         net_recv = net_io.bytes_recv
     except Exception as e:
-        logger.error(f"Eroare la monitorizarea rețelei: {str(e)}")
+        logger.error(f"Eroare la monitorizarea retelei: {str(e)}")
         net_sent = 0
         net_recv = 0
+
+    global prev_read, prev_write, prev_sent, prev_recv, prev_time
+    current_time = time.time()
+    elapsed = current_time - prev_time
+
+    io_rate = {
+        "read_rate": (read_bytes - prev_read) / elapsed,
+        "write_rate": (write_bytes - prev_write) / elapsed,
+        "net_sent_rate": (net_sent - prev_sent) / elapsed,
+        "net_recv_rate": (net_recv - prev_recv) / elapsed
+    }
+
+    prev_read = read_bytes
+    prev_write = write_bytes
+    prev_sent = net_sent
+    prev_recv = net_recv
+    prev_time = current_time
 
     return {
         "timestamp": ts,
@@ -169,12 +194,13 @@ def collect_system_metrics():
         "read_bytes": read_bytes,
         "write_bytes": write_bytes,
         "net_sent": net_sent,
-        "net_recv": net_recv
-    }
+        "net_recv": net_recv,
+        "io_rate": io_rate
+        }
 
 
 def get_top_processes():
-    """Obține top procese pentru CPU, memorie și I/O"""
+    """Obtine top procese pentru CPU, memorie si I/O"""
     top_cpu = []
     top_mem = []
     top_disk = []
@@ -197,11 +223,24 @@ def get_top_processes():
         "top_disk": sorted(top_disk, key=lambda x: x[2], reverse=True)[:3]
     }
 
+def save_top_processes_csv(top_data):
+    try:
+        with open(CONFIG["TOP_PROC_LOG"], "a", newline="") as f:
+            writer = csv.writer(f)
+            ts = datetime.now().isoformat()
+            for proc in top_data['top_cpu']:
+                writer.writerow([ts, "CPU", proc[0], proc[1], proc[2]])
+            for proc in top_data['top_mem']:
+                writer.writerow([ts, "MEM", proc[0], proc[1], proc[2]])
+            for proc in top_data['top_disk']:
+                writer.writerow([ts, "DISK_IO", proc[0], proc[1], proc[2]])
+    except Exception as e:
+        logger.error(f"Eroare la salvarea top proceselor: {str(e)}")
 
 
 # === Verificări de securitate ===
 def check_open_ports():
-    """Verifică porturile deschise"""
+    """Verifica porturile deschise"""
     try:
         result = subprocess.run(["ss", "-tulnp"], 
                               capture_output=True, 
@@ -214,7 +253,7 @@ def check_open_ports():
 
 
 def check_installed_packages():
-    """Verifică pachete nou instalate"""
+    """Verifica pachete nou instalate"""
     try:
         if os.path.exists("/var/log/dpkg.log"):
             result = subprocess.run(["grep", " install ", "/var/log/dpkg.log"], 
@@ -227,7 +266,7 @@ def check_installed_packages():
 
 
 def check_root_processes():
-    """Identifică procese care rulează cu drepturi de root"""
+    """Identifica procese care ruleaza cu drepturi de root"""
     root_procs = []
     for proc in psutil.process_iter(['pid', 'name', 'username', 'exe']):
         try:
@@ -237,32 +276,37 @@ def check_root_processes():
             continue
     
     if root_procs:
-        logger.info(f"Procese care rulează ca root: {len(root_procs)}")
+        logger.info(f"Procese care ruleaza ca root: {len(root_procs)}")
 
     #Afișează doar primele 10
-    for pid, name in root_procs[:10]: 
-         logger.warning(f"  {name} (PID {pid})")
+    #for pid, name in root_procs[:10]: 
+         #logger.warning(f"  {name} (PID {pid})")
     
 
     return root_procs
 
 
 def get_cronjobs():
-    """Obține cronjob-uri pentru utilizatorul curent"""
+    """Obtine cronjob-uri pentru utilizatorul curent"""
     try:
-        result = subprocess.run(["crontab", "-l"], 
-                              capture_output=True, 
-                              text=True)
-        if result.returncode == 0:
-            return result.stdout.strip()
-        return "Nu există cronjob-uri"
+        users = [u.pw_name for u in pwd.getpwall() if u.pw_uid >= 1000 and '/home' in u.pw_dir]
+        all_crons = []
+        for user in users:
+            result = subprocess.run(["crontab", "-l", "-u", user],
+                                    capture_output=True,
+                                    text=True)
+            if result.returncode == 0 and result.stdout.strip():
+                all_crons.append(f"=== Cronjob-uri pentru {user} ===\n{result.stdout.strip()}")
+        if not all_crons:
+            return "Nu exista cronjob-uri"
+        return "\n\n".join(all_crons)
     except Exception as e:
-        logger.error(f"Eroare la obținerea cronjob-urilor: {str(e)}")
-        return ""
+        logger.error(f"Eroare la obtinerea cronjob-urilor: {str(e)}")
+        return "Eroare la obtinerea cronjob-urilor"
 
 
 def monitor_app(name):
-    """Monitorizează o aplicație specifică"""
+    """Monitorizeaza o aplicatie specifica"""
     app_processes = []
     for proc in psutil.process_iter(['pid', 'name']):
         try:
@@ -272,7 +316,7 @@ def monitor_app(name):
             continue
     
     if not app_processes:
-        logger.warning(f"Aplicația {name} nu rulează!")
+        logger.warning(f"Aplicatia {name} nu ruleaza!")
     
     return app_processes
 
@@ -293,7 +337,7 @@ def monitor_sshd():
 
 # === Salvare date ===
 def save_to_csv(data):
-    """Salvează metricile în fișier CSV"""
+    """Salveaza metricile în fisier CSV"""
     try:
         write_header = not os.path.exists(CONFIG["CSV_LOG"])
         with open(CONFIG["CSV_LOG"], "a", newline="") as f:
@@ -315,7 +359,7 @@ def save_to_csv(data):
                 data["net_recv"]
             ])
     except Exception as e:
-        logger.error(f"Eroare la salvarea în CSV: {str(e)}")
+        logger.error(f"Eroare la salvarea in CSV: {str(e)}")
 
 # === Funcția principală ===
 def main():
@@ -335,6 +379,7 @@ def main():
             
             # Salvarea datelor
             save_to_csv(metrics)
+            save_top_processes_csv(top_processes)
             log_alerts(alerts)
             
             # Afișare informații în consolă
@@ -346,10 +391,10 @@ def main():
                 print(f"  {mount}: {percent}%")
             
             print(f"\nI/O Disk: Read={metrics['read_bytes']} bytes | Write={metrics['write_bytes']} bytes")
-            print(f"Rețea: Sent={metrics['net_sent']} bytes | Recv={metrics['net_recv']} bytes")
+            print(f"Retea: Sent={metrics['net_sent']} bytes | Recv={metrics['net_recv']} bytes")
             
             if alerts:
-                print("\n Alerte fișiere modificate:")
+                print("\n Alerte fisiere modificate:")
                 for alert in alerts:
                     print(f"  {alert}")
             
@@ -372,29 +417,29 @@ def main():
             print("\n=== Pachete instalate recent ===")
             print(check_installed_packages() or "Niciun pachet nou instalat")
             
-            print("\n=== Procese care rulează ca root ===")
+            print("\n=== Procese care ruleaza ca root ===")
             root_procs = check_root_processes()
             if root_procs:
                 for pid, name in root_procs:
                     print(f"  {name} (PID {pid})")
             else:
-                print("  Nu există procese care rulează ca root")
+                print("  Nu exista procese care ruleaza ca root")
             
             print("\n=== Cronjobs ===")
             print(get_cronjobs())
             
-            print(f"\n=== Monitorizare aplicație ({CONFIG['MONITOR_APP']}) ===")
+            print(f"\n=== Monitorizare aplicatie ({CONFIG['MONITOR_APP']}) ===")
             apps = monitor_app(CONFIG["MONITOR_APP"])
             if apps:
                 for app in apps:
                     print(f"  {app['name']} (PID {app['pid']})")
             else:
-                print("  Aplicația nu rulează!")
+                print("  Aplicatia nu ruleaza!")
             
         except Exception as e:
-            logger.error(f"Eroare în bucla principală: {str(e)}")
+            logger.error(f"Eroare in bucla principala: {str(e)}")
         
-        # Așteptare pentru următorul ciclu
+        # Asteptare pentru urmatorul ciclu
         elapsed = time.time() - start_time
         sleep_time = max(0, CONFIG["LOG_INTERVAL"] - elapsed)
         time.sleep(sleep_time)
@@ -405,5 +450,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         logger.info("Monitor oprit manual")
     except Exception as e:
-        logger.critical(f"Eroare critică: {str(e)}")
+        logger.critical(f"Eroare critica: {str(e)}")
         raise
