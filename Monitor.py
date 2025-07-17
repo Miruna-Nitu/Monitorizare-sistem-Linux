@@ -11,15 +11,16 @@ from datetime import datetime
 import logging
 import socket
 
+LOG_BASE = "/home/miruna/Desktop/git/Monitorizare-sistem-Linux/logs"
 
 # === Configurație ===
 CONFIG = {
     "MONITORED_FILES": ["/etc/passwd", "/etc/hosts","/etc/shadow"],
-    "LOG_DIR": os.path.expanduser("~/monitor_logs"),
-    "HASH_FILE": os.path.expanduser("~/monitor_logs/hashes.json"),
-    "CSV_LOG": os.path.expanduser("~/monitor_logs/system.csv"),
-    "TOP_PROC_LOG": os.path.expanduser("~/monitor_logs/top_processes.csv"),
-    "ALERT_LOG": os.path.expanduser("~/monitor_logs/alerts.log"),
+    "LOG_DIR": LOG_BASE,
+    "HASH_FILE": os.path.join(LOG_BASE,"hashes.json"),
+    "CSV_LOG": os.path.join(LOG_BASE,"system.csv"),
+    "TOP_PROC_LOG": os.path.join(LOG_BASE, "top_processes.csv"),
+    "ALERT_LOG": os.path.join(LOG_BASE, "alerts.log"),
     "LOG_INTERVAL": 60,
     "MONITOR_APP": "sshd",
     "ALERT_THRESHOLDS": {

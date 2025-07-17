@@ -35,10 +35,10 @@ Aplicatie Python de monitorizare avansata a resurselor si starii sistemului Linu
 ```bash
 Monitorizare-sistem-Linux/
 ├── Monitor.py                # Script principal CLI (rulat ca serviciu)
-├── gui_monitor.py           # Interfata grafica PyQt6
-├── monitor.service          # Fisier serviciu systemd
-├── start_monitor_service.sh # Script automat instalare si pornire serviciu
-├── monitor_logs/            # Folder loguri generate automat
+├── gui_monitor.py            # Interfata grafica PyQt6
+├── monitor.service           # Fisier serviciu systemd
+├── start_monitor_service.sh  # Script automat instalare si pornire serviciu
+├── logs/                     # Folder loguri generate automat
 │   ├── system.csv
 │   ├── top_processes.csv
 │   ├── alerts.log
