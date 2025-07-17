@@ -223,6 +223,35 @@ def get_top_processes():
         "top_disk": sorted(top_disk, key=lambda x: x[2], reverse=True)[:3]
     }
 
+def get_top_network_processes():
+    """Returnează procese care au conexiuni de rețea active"""
+    try:
+        output = subprocess.check_output(["ss", "-tunp"], text=True)
+        lines = output.strip().split("\n")[1:]  # Skip header
+        connections = {}
+        for line in lines:
+            if "pid=" in line:
+                parts = line.split("pid=")
+                pid_part = parts[1].split(",")[0]
+                try:
+                    pid = int(pid_part)
+                    connections[pid] = connections.get(pid, 0) + 1
+                except ValueError:
+                    continue
+        result = []
+        for pid, count in sorted(connections.items(), key=lambda x: x[1], reverse=True)[:3]:
+            try:
+                proc = psutil.Process(pid)
+                name = proc.name()
+            except Exception:
+                name = "N/A"
+            result.append((pid, name, count))
+        return result
+    except Exception as e:
+        logger.error(f"Eroare top procese rețea: {str(e)}")
+        return []
+
+
 def save_top_processes_csv(top_data):
     try:
         with open(CONFIG["TOP_PROC_LOG"], "a", newline="") as f:
@@ -376,6 +405,11 @@ def main():
             alerts = detect_file_changes()
             metrics = collect_system_metrics()
             top_processes = get_top_processes()
+            net_top = get_top_network_processes()
+            print("\nTop procese cu conexiuni rețea active:")
+            for pid, name, count in net_top:
+                print(f"  {name} (PID {pid}): {count} conexiuni")
+
             
             # Salvarea datelor
             save_to_csv(metrics)

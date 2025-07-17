@@ -101,11 +101,16 @@ class ResourceMonitor(QWidget):
         self.proc_table.setHorizontalHeaderLabels(["PID", "Nume", "CPU %", "Memorie %", "I/O (bytes)"])
         self.proc_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
+        self.net_proc_text = QTextEdit()
+        self.net_proc_text.setReadOnly(True)
+
         self.root_proc_text = QTextEdit()
         self.root_proc_text.setReadOnly(True)
 
         layout.addWidget(QLabel("Top Procese"))
         layout.addWidget(self.proc_table)
+        layout.addWidget(QLabel("Top Procese Rețea"))
+        layout.addWidget(self.net_proc_text)
         layout.addWidget(QLabel("Procese Root"))
         layout.addWidget(self.root_proc_text)
 
@@ -143,6 +148,7 @@ class ResourceMonitor(QWidget):
     def update_data(self):
         self.update_resources()
         self.update_top_processes()
+        self.update_net_processes()
         self.update_root_processes()
         self.update_ports()
         self.update_packages()
@@ -186,6 +192,33 @@ class ResourceMonitor(QWidget):
         for row, proc in enumerate(procs):
             for col, val in enumerate(proc):
                 self.proc_table.setItem(row, col, QTableWidgetItem(str(val)))
+
+    def update_net_processes(self):
+        try:
+            result = subprocess.check_output(["ss", "-tunp"], text=True)
+            lines = result.strip().split("\n")[1:]
+            connections = {}
+            for line in lines:
+                if "pid=" in line:
+                    pid_part = line.split("pid=")[1].split(",")[0]
+                    try:
+                        pid = int(pid_part)
+                        connections[pid] = connections.get(pid, 0) + 1
+                    except ValueError:
+                        continue
+            sorted_conn = sorted(connections.items(), key=lambda x: x[1], reverse=True)[:3]
+            output = []
+            for pid, count in sorted_conn:
+                try:
+                    proc = psutil.Process(pid)
+                    name = proc.name()
+                except:
+                    name = "N/A"
+                output.append(f"{name} (PID {pid}): {count} conexiuni")
+            self.net_proc_text.setPlainText("\n".join(output))
+        except Exception as e:
+            self.net_proc_text.setPlainText(f"Eroare: {str(e)}")
+
 
     def update_root_processes(self):
         output = []
