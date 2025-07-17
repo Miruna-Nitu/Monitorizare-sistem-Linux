@@ -30,7 +30,7 @@ Aplicatie Python de monitorizare avansata a resurselor si starii sistemului Linu
 * Salvare metrici in `CSV`, `JSON`, `log` si `alerts.log`
 * Interfata GUI organizata in 3 tab-uri: Resurse, Procese, Securitate
 
-## ⚙️ Structura proiectului
+## Structura proiectului
 
 ```bash
 Monitorizare-sistem-Linux/

@@ -391,7 +391,7 @@ def save_to_csv(data):
     except Exception as e:
         logger.error(f"Eroare la salvarea in CSV: {str(e)}")
 
-# === Funcția principală ===
+# === Functia principala ===
 def main():
     logger.info("Pornire serviciu de monitorizare sistem")
     
